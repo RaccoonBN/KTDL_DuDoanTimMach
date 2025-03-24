@@ -312,32 +312,38 @@ selected_exercise = list(exercise_status_mapping.keys())[list(exercise_status_ma
 
 # Collect input data
 input_data = {
-    'gender': gender,
-    'race': race,
-    'general_health': general_health,
-    'health_care_provider': health_care_provider,
-    'could_not_afford_to_see_doctor': could_not_afford_to_see_doctor,
-    'length_of_time_since_last_routine_checkup': length_of_time_since_last_routine_checkup,
-    'ever_diagnosed_with_heart_attack': heart_attack,
-    'ever_diagnosed_with_a_stroke': stroke,
-    'ever_told_you_had_a_depressive_disorder': depressive_disorder,
-    'ever_told_you_have_kidney_disease': kidney_disease,
-    'ever_told_you_had_diabetes': diabetes,
-    'BMI': bmi,
-    'difficulty_walking_or_climbing_stairs': walking,
-    'physical_health_status': physical_health,
-    'mental_health_status': mental_health,
-    'asthma_Status': asthma,
-    'smoking_status': smoking_status,
-    'binge_drinking_status': binge_drinking_status,
-    'exercise_status_in_past_30_Days': exercise_status,
-    'age_category': age_category,
-    'sleep_category': sleep_category,
-    'drinks_category': drinks_category
+    'gender': selected_gender,
+    'race': selected_race,
+    'general_health': selected_general_health,
+    'health_care_provider': selected_health_care_provider,
+    'could_not_afford_to_see_doctor': selected_could_not_afford_to_see_doctor,
+    'length_of_time_since_last_routine_checkup': selected_length_of_time_since_last_routine_checkup,
+    'ever_diagnosed_with_heart_attack': selected_heart_attack,
+    'ever_diagnosed_with_a_stroke': selected_stroke,
+    'ever_told_you_had_a_depressive_disorder': selected_depressive_disorder,
+    'ever_told_you_have_kidney_disease': selected_kidney_disease,
+    'ever_told_you_had_diabetes': selected_diabetes,
+    'BMI': selected_bmi,
+    'difficulty_walking_or_climbing_stairs': selected_walking,
+    'physical_health_status': selected_physical_health,
+    'mental_health_status': selected_mental_health,
+    'asthma_Status': selected_asthma,
+    'smoking_status': selected_smoking,
+    'binge_drinking_status': selected_binge_drinking,
+    'exercise_status_in_past_30_Days': selected_exercise,
+    'age_category': selected_age,
+    'sleep_category': selected_sleep,
+    'drinks_category': selected_drinks
 }
 
 def predict_heart_disease_risk(input_data, model, encoder):
     input_df = pd.DataFrame([input_data])
+    
+    # Chỉ hiển thị khi debug_mode = True 
+    debug_mode = False
+    if debug_mode:
+        st.write("Debug - Dữ liệu đầu vào:", input_df)
+        
     input_encoded = encoder.transform(input_df, y=None, override_return_df=False)
     prediction = model.predict_proba(input_encoded)[:, 1][0] * 100
     return prediction
@@ -376,218 +382,173 @@ if btn1:
                 'Feature': input_encoded.columns,
                 'Importance': feature_importances
             }).sort_values(by='Importance', ascending=False)
+                
+            # Hiển thị tất cả các feature importance để debug
+            st.write("#### Tất cả các yếu tố đóng góp:")
+            st.dataframe(feature_importance_df)
 
             recommendations = []
             if risk > 70:
-                recommendations.append("Nguy cơ mắc bệnh tim của bạn rất cao. Dưới đây là một số lời khuyên để giảm nguy cơ của bạn:")
+                recommendations.append("Nguy cơ mắc bệnh tim của bạn rất cao. Dưới đây là các yếu tố đóng góp theo thứ tự quan trọng:")
             elif risk > 40:
-                recommendations.append("Nguy cơ mắc bệnh tim của bạn cao. Dưới đây là một số lời khuyên để giảm nguy cơ của bạn:")
+                recommendations.append("Nguy cơ mắc bệnh tim của bạn cao. Dưới đây là các yếu tố đóng góp theo thứ tự quan trọng:")
             elif risk > 25:
-                recommendations.append("Nguy cơ mắc bệnh tim của bạn ở mức độ trung bình. Dưới đây là một số lời khuyên để giảm nguy cơ của bạn:")
+                recommendations.append("Nguy cơ mắc bệnh tim của bạn ở mức độ trung bình. Dưới đây là các yếu tố đóng góp theo thứ tự quan trọng:")
             else:
-                recommendations.append("Nguy cơ mắc bệnh tim của bạn thấp. Hãy tiếp tục duy trì lối sống lành mạnh.")
-            if risk > 25:
-                cumulative_importance = 0
-                important_features = set()
-                for index, row in feature_importance_df.iterrows():
-                    cumulative_importance += row['Importance']
-                    important_features.add(row['Feature'])
-                    if cumulative_importance >= 50:
-                        break
+                recommendations.append("Nguy cơ mắc bệnh tim của bạn thấp. Dưới đây là các yếu tố đóng góp theo thứ tự quan trọng:")
+            
+            st.write(recommendations[0])
+            
+            # Khởi tạo mặc định cho pie_df
+            pie_df = pd.DataFrame({'Feature': ['Không có yếu tố đáng kể'], 'Importance': [100]})
+            
+            # Thay đổi: Lấy TẤT CẢ các features thay vì chỉ lấy đến 50% cumulative importance
+            important_features = set(input_encoded.columns)
+            final_features = []
+            feature_to_recommendation = {}
+            
+            # Dictionary ánh xạ tên feature sang tên hiển thị tiếng Việt
+            feature_name_mapping = {
+                'ever_diagnosed_with_heart_attack': 'Nhồi máu cơ tim',
+                'general_health': 'Sức khỏe chung',
+                'ever_diagnosed_with_a_stroke': 'Đột quỵ',
+                'ever_told_you_have_kidney_disease': 'Bệnh thận',
+                'ever_told_you_had_diabetes': 'Bệnh tiểu đường',
+                'physical_health_status': 'Sức khỏe thể chất',
+                'ever_told_you_had_a_depressive_disorder': 'Rối loạn trầm cảm',
+                'sleep_category': 'Giấc ngủ',
+                'age_category': 'Độ tuổi',
+                'length_of_time_since_last_routine_checkup': 'Thời gian kiểm tra sức khỏe gần nhất',
+                'BMI': 'Chỉ số BMI',
+                'smoking_status': 'Hút thuốc',
+                'exercise_status_in_past_30_Days': 'Tập thể dục',
+                'binge_drinking_status': 'Uống rượu thái quá',
+                'drinks_category': 'Rượu bia',
+                'could_not_afford_to_see_doctor': 'Không đủ tiền để đi khám bác sĩ',
+                'health_care_provider': 'Cung cấp dịch vụ y tế',
+                'asthma_Status': 'Hen suyễn',
+                'difficulty_walking_or_climbing_stairs': 'Khó khăn khi đi bộ hoặc leo cầu thang',
+                'mental_health_status': 'Sức khỏe tâm thần',
+                'gender': 'Giới tính',
+                'race': 'Dân tộc'
+            }
+            
+            # Tạo khuyến nghị cho TẤT CẢ các features
+            for feature in feature_importance_df['Feature']:
+                importance = feature_importance_df.loc[feature_importance_df['Feature'] == feature, 'Importance'].values[0]
                 
-                # Đảm bảo các đặc tính quan trọng chỉ được thêm một lần duy nhất
-                additional_features = [
-                    ('ever_told_you_had_diabetes', diabetes == "yes"),
-                    ('ever_diagnosed_with_heart_attack', heart_attack == "yes"),
-                    ('ever_told_you_had_a_depressive_disorder', depressive_disorder == "yes"),
-                    ('ever_diagnosed_with_a_stroke', stroke == "yes"),
-                    ('age_category', age_category in ["Age_55_to_59", "Age_60_to_64", "Age_65_to_69", "Age_70_to_74", "Age_75_to_79", "Age_80_or_older"]),
-                    ('length_of_time_since_last_routine_checkup', length_of_time_since_last_routine_checkup in ["Age_55_to_59", "Age_60_to_64", "Age_65_to_69", "Age_70_to_74", "Age_75_to_79", "Age_80_or_older"]),
-                    ('general_health', general_health in ["fair", "poor"]),
-                    ('BMI', bmi in ["overweight_bmi_25_to_29_9", "obese_bmi_30_or_more"]),
-                    ('smoking_status', smoking_status != "never_smoked"),
-                    ('exercise_status_in_past_30_Days', exercise_status == "no"),
-                    ('binge_drinking_status', binge_drinking_status == "yes"),
-                    ('drinks_category', drinks_category in ["high_consumption_10.01_to_20_drinks", "very_high_consumption_more_than_20_drinks"]),
-                    ('sleep_category', sleep_category in ["short_sleep_4_to_5_hours", "very_short_sleep_0_to_3_hours"]),
-                    ('physical_health_status', physical_health in ["1_to_13_days_not_good", "14_plus_days_not_good"]),
-                    ('mental_health_status', mental_health in ["1_to_13_days_not_good", "14_plus_days_not_good"]),
-                    ('asthma_Status', asthma in ["current_asthma", "former_asthma"]),
-                    ('difficulty_walking_or_climbing_stairs', walking == "yes"),
-                    ('length_of_time_since_last_routine_checkup', length_of_time_since_last_routine_checkup != "past_year"),
-                    ('could_not_afford_to_see_doctor', could_not_afford_to_see_doctor == "yes"),
-                    ('health_care_provider', health_care_provider == "no"),
-                    ('ever_told_you_have_kidney_disease', kidney_disease == "yes")
-                ]
+                # Thêm tất cả các feature vào final_features
+                final_features.append(feature)
+                
+                # Tạo khuyến nghị mặc định dựa trên mức độ quan trọng
+                feature_display_name = feature_name_mapping.get(feature, feature)
+                recommendation = f"- {feature_display_name} đóng góp {importance:.2f}% vào nguy cơ của bạn."
+                
+                # Bổ sung thêm hướng dẫn cụ thể cho từng feature nếu cần
+                if feature == 'ever_diagnosed_with_heart_attack' and selected_heart_attack == "yes":
+                    recommendation += " Hãy thường xuyên thăm khám bác sĩ tim mạch và tuân thủ các chỉ định về thuốc."
+                elif feature == 'ever_diagnosed_with_a_stroke' and selected_stroke == "yes":
+                    recommendation += " Hãy tuân theo chỉ dẫn của bác sĩ thần kinh và dùng thuốc theo chỉ định."
+                elif feature == 'age_category' and selected_age in ["Age_55_to_59", "Age_60_to_64", "Age_65_to_69", "Age_70_to_74", "Age_75_to_79", "Age_80_or_older"]:
+                    recommendation += " Dù không thể thay đổi độ tuổi, nhưng việc duy trì lối sống lành mạnh có thể giảm thiểu các nguy cơ liên quan đến tuổi tác."
+                # ... thêm các điều kiện tương tự cho các feature khác
+                
+                feature_to_recommendation[feature] = recommendation
+            
+            # Chuẩn bị dữ liệu cho biểu đồ hình tròn (top 10 yếu tố quan trọng nhất)
+            top_features = feature_importance_df.head(10)['Feature'].tolist()
+            top_importance = feature_importance_df.head(10)['Importance'].tolist()
+            other_importance = 100 - sum(top_importance)
+            
+            pie_data = {
+                'Feature': [feature_name_mapping.get(feature, feature) for feature in top_features] + ['Yếu tố khác'],
+                'Importance': top_importance + [other_importance]
+            }
+            pie_df = pd.DataFrame(pie_data)
 
-
-                for feature, condition in additional_features:
-                    if condition:
-                        important_features.add(feature)
-
-                feature_name_mapping = {
-                    'ever_diagnosed_with_heart_attack': 'Nhồi máu cơ tim',
-                    'general_health': 'Sức khỏe chung',
-                    'ever_diagnosed_with_a_stroke': 'Đột quỵ',
-                    'ever_told_you_have_kidney_disease': 'Bệnh thận',
-                    'ever_told_you_had_diabetes': 'Bệnh tiểu đường',
-                    'physical_health_status': 'Sức khỏe thể chất',
-                    'ever_told_you_had_a_depressive_disorder': 'Rối loạn trầm cảm',
-                    'sleep_category': 'Giấc ngủ',
-                    'age_category': 'Độ tuổi',
-                    'length_of_time_since_last_routine_checkup': 'Thời gian kiểm tra sức khỏe gần nhất',
-                    'BMI': 'Chỉ số BMI',
-                    'smoking_status': 'Hút thuốc',
-                    'exercise_status_in_past_30_Days': 'Tập thể dục',
-                    'binge_drinking_status': 'Uống rượu thái quá',
-                    'drinks_category': 'Rượu bia',
-                    'could_not_afford_to_see_doctor': 'Không đủ tiền để đi khám bác sĩ',
-                    'health_care_provider': 'Cung cấp dịch vụ y tế',
-                    'asthma_Status': 'Hen suyễn',
-                    'difficulty_walking_or_climbing_stairs': 'Khó khăn khi đi bộ hoặc leo cầu thang',
-                    'mental_health_status': 'Sức khỏe tâm thần'
-                }
-
-                # Đảm bảo rằng các yếu tố có khuyến nghị được đưa vào danh sách yếu tố cuối cùng
-                final_features = []  # Danh sách các yếu tố quan trọng
-                feature_to_recommendation = {}  # Từ điển lưu trữ khuyến nghị cho từng yếu tố
-
-                # Duyệt qua các yếu tố quan trọng và thêm khuyến nghị cho từng yếu tố nếu cần
-                for feature in important_features:
-                    importance = feature_importance_df.loc[feature_importance_df['Feature'] == feature, 'Importance'].values[0]
-                    
-                    # Kiểm tra và tạo khuyến nghị cho các yếu tố cụ thể
-                    if feature == 'ever_diagnosed_with_heart_attack' and heart_attack == "yes":
-                        recommendation = f"- Tiền sử nhồi máu cơ tim đóng góp {importance:.2f}% vào nguy cơ của bạn. Hãy thường xuyên thăm khám bác sĩ tim mạch và tuân thủ các chỉ định về thuốc. Theo dõi các triệu chứng mới hoặc tiến triển xấu và tìm sự hỗ trợ y tế ngay khi cần."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-                    
-                    if feature == 'ever_diagnosed_with_a_stroke' and stroke == "yes":
-                        recommendation = f"- Tiền sử đột quỵ đóng góp {importance:.2f}% vào nguy cơ của bạn. Hãy tuân theo chỉ dẫn của bác sĩ thần kinh và dùng thuốc theo chỉ định. Thực hiện các bài tập vật lý trị liệu để phục hồi sức mạnh và khả năng vận động."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                    if feature == 'age_category' and age_category in ["Age_55_to_59", "Age_60_to_64", "Age_65_to_69", "Age_70_to_74", "Age_75_to_79", "Age_80_or_older"]:
-                        recommendation = f"- Nhóm tuổi đóng góp {importance:.2f}% vào nguy cơ của bạn. Dù không thể thay đổi độ tuổi, nhưng việc duy trì lối sống lành mạnh có thể giảm thiểu các nguy cơ liên quan đến tuổi tác. Hãy đảm bảo kiểm tra sức khỏe định kỳ, ăn uống cân đối, vận động và tránh hút thuốc."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                    if feature == 'general_health' and general_health in ["fair", "poor"]:
-                        recommendation = f"- Tình trạng sức khỏe chung đóng góp {importance:.2f}% vào nguy cơ của bạn. Hãy tập trung vào việc cải thiện sức khỏe tổng thể qua chế độ ăn uống cân bằng và kiểm tra sức khỏe định kỳ."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                    if feature == 'ever_told_you_have_kidney_disease' and kidney_disease == "yes":
-                        recommendation = f"- Bệnh thận đóng góp {importance:.2f}% vào nguy cơ của bạn. Hãy theo dõi chức năng thận thường xuyên và tuân thủ chỉ dẫn của bác sĩ để quản lý tình trạng này. Uống đủ nước và duy trì chế độ ăn uống thân thiện với thận."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                    if feature == 'ever_told_you_had_diabetes' and diabetes == "yes":
-                        recommendation = f"- Tiểu đường đóng góp {importance:.2f}% vào nguy cơ của bạn. Hãy kiểm soát tiểu đường thông qua chế độ ăn uống, luyện tập và dùng thuốc theo chỉ định của bác sĩ."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                    if feature == 'smoking_status' and smoking_status != "never_smoked":
-                        recommendation = f"- Tình trạng hút thuốc đóng góp {importance:.2f}% vào nguy cơ của bạn. Hãy bỏ thuốc để giảm nguy cơ mắc bệnh tim mạch."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                    if feature == 'exercise_status_in_past_30_Days' and exercise_status == "no":
-                        recommendation = f"- Thiếu vận động đóng góp {importance:.2f}% vào nguy cơ của bạn. Hãy tham gia vào các hoạt động thể chất thường xuyên để cải thiện sức khỏe tim mạch."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                    if feature == 'binge_drinking_status' and binge_drinking_status == "yes":
-                        recommendation = f"- Uống rượu quá mức đóng góp {importance:.2f}% vào nguy cơ của bạn. Giảm hoặc loại bỏ việc tiêu thụ rượu có thể giảm đáng kể nguy cơ bệnh tim mạch. Hãy xem xét tìm kiếm sự hỗ trợ để kiểm soát hoặc ngừng uống rượu."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                    if feature == 'drinks_category' and drinks_category in ["high_consumption_10.01_to_20_drinks", "very_high_consumption_more_than_20_drinks"]:
-                        recommendation = f"- Tiêu thụ rượu đóng góp {importance:.2f}% vào nguy cơ của bạn. Hãy hạn chế việc uống rượu để giảm nguy cơ."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                    if feature == 'sleep_category' and sleep_category in ["short_sleep_4_to_5_hours", "very_short_sleep_0_to_3_hours"]:
-                        recommendation = f"- Chất lượng giấc ngủ đóng góp {importance:.2f}% vào nguy cơ của bạn. Hãy cố gắng ngủ đủ 7-9 giờ mỗi đêm. Giấc ngủ đủ và chất lượng rất quan trọng đối với sức khỏe tim mạch."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                    if feature == 'physical_health_status' and physical_health in ["1_to_13_days_not_good", "14_plus_days_not_good"]:
-                        recommendation = f"- Tình trạng sức khỏe thể chất đóng góp {importance:.2f}% vào nguy cơ của bạn. Hãy tham gia vào các hoạt động thể chất thường xuyên và tham khảo ý kiến bác sĩ nếu gặp vấn đề sức khỏe thể chất kéo dài."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                    if feature == 'mental_health_status' and mental_health in ["1_to_13_days_not_good", "14_plus_days_not_good"]:
-                        recommendation = f"- Tình trạng sức khỏe tâm thần đóng góp {importance:.2f}% vào nguy cơ của bạn. Hãy tìm kiếm sự hỗ trợ từ chuyên gia sức khỏe tâm thần và thực hành các hoạt động giảm stress."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                    if feature == 'asthma_Status' and asthma in ["current_asthma", "former_asthma"]:
-                        recommendation = f"- Hen suyễn đóng góp {importance:.2f}% vào nguy cơ của bạn. Hãy tuân thủ kế hoạch điều trị hen suyễn, tránh các tác nhân gây hen và sử dụng thuốc theo chỉ định."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                    if feature == 'ever_told_you_had_a_depressive_disorder' and depressive_disorder == "yes":
-                        recommendation = f"- Rối loạn trầm cảm đóng góp {importance:.2f}% vào nguy cơ của bạn. Hãy tìm kiếm sự hỗ trợ từ chuyên gia sức khỏe tâm thần, thực hành các hoạt động giảm căng thẳng và duy trì một lối sống lành mạnh."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                    if feature == 'difficulty_walking_or_climbing_stairs' and walking == "yes":
-                        recommendation = f"- Khó khăn trong việc đi bộ hoặc leo cầu thang đóng góp {importance:.2f}% vào nguy cơ của bạn. Hãy tham khảo ý kiến bác sĩ để có các phương pháp điều trị và bài tập giúp cải thiện khả năng vận động và sức mạnh."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                    if feature == 'length_of_time_since_last_routine_checkup' and length_of_time_since_last_routine_checkup != "past_year":
-                        recommendation = f"- Thời gian từ lần kiểm tra sức khỏe gần nhất đóng góp {importance:.2f}% vào nguy cơ của bạn. Các kiểm tra sức khỏe định kỳ rất quan trọng để phát hiện sớm và quản lý các vấn đề sức khỏe. Hãy lên lịch hẹn thăm khám bác sĩ định kỳ để theo dõi và duy trì sức khỏe tim mạch."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                    if feature == 'could_not_afford_to_see_doctor' and could_not_afford_to_see_doctor == "yes":
-                        recommendation = f"- Khó khăn tài chính trong việc thăm khám bác sĩ đóng góp {importance:.2f}% vào nguy cơ của bạn. Hãy khám phá các dịch vụ y tế cộng đồng, các phòng khám theo mô hình thu phí thấp hoặc các lựa chọn bảo hiểm sức khỏe để đảm bảo bạn có quyền truy cập vào dịch vụ y tế cần thiết."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                    if feature == 'health_care_provider' and health_care_provider == "no":
-                        recommendation = f"- Không có bác sĩ chăm sóc sức khỏe chính đóng góp {importance:.2f}% vào nguy cơ của bạn. Việc xây dựng mối quan hệ với bác sĩ chăm sóc sức khỏe chính giúp quản lý và ngăn ngừa các vấn đề sức khỏe. Hãy tìm kiếm bác sĩ chăm sóc sức khỏe chính để đảm bảo việc kiểm tra và tư vấn y tế định kỳ."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                    if feature == 'BMI' and bmi in ["overweight_bmi_25_to_29_9", "obese_bmi_30_or_more"]:
-                        recommendation = f"- Chỉ số BMI đóng góp {importance:.2f}% vào nguy cơ của bạn. Duy trì một cân nặng khỏe mạnh thông qua chế độ ăn uống cân đối và luyện tập thể thao thường xuyên có thể giúp giảm nguy cơ bệnh tim mạch. Hãy tham khảo bác sĩ để nhận lời khuyên cụ thể."
-                        feature_to_recommendation[feature] = recommendation
-                        final_features.append(feature)
-
-                # Tính toán tỷ lệ đóng góp còn lại cho "Yếu tố khác"
-                total_importance = sum([feature_importance_df.loc[feature_importance_df['Feature'] == feature, 'Importance'].values[0] for feature in final_features])
-                other_factors_importance = 100 - total_importance
-
-                # Chuẩn bị dữ liệu cho biểu đồ hình tròn
-                pie_data = {
-                    'Feature': [feature_name_mapping[feature] for feature in final_features] + ['Yếu tố khác'],
-                    'Importance': [feature_importance_df.loc[feature_importance_df['Feature'] == feature, 'Importance'].values[0] for feature in final_features] + [other_factors_importance]
-                }
-                pie_df = pd.DataFrame(pie_data)
-
-
-               # Tạo biểu đồ hình tròn
-            fig = px.pie(pie_df, names='Feature', values='Importance')  #, title='Đóng góp vào Nguy cơ Bệnh Tim Mạch'
+            # Tạo biểu đồ hình tròn
+            fig = px.pie(pie_df, names='Feature', values='Importance')
 
             # Hiển thị biểu đồ hình tròn
             with row8_2:
                 st.write("""
-                        #### Đóng góp vào Nguy cơ Bệnh Tim Mạch
+                        #### Đóng góp vào Nguy cơ Bệnh Tim Mạch (Top 10 yếu tố)
                         """)
                 st.plotly_chart(fig)
 
-            # Hiển thị các khuyến nghị theo thứ tự giảm dần
-            sorted_recommendations = sorted([(feature, feature_to_recommendation[feature]) for feature in final_features], key=lambda x: feature_importance_df.loc[feature_importance_df['Feature'] == x[0], 'Importance'].values[0], reverse=True)
+            # Hiển thị tất cả các khuyến nghị theo thứ tự giảm dần
+            sorted_recommendations = sorted([(feature, feature_to_recommendation[feature]) for feature in final_features], 
+                                          key=lambda x: feature_importance_df.loc[feature_importance_df['Feature'] == x[0], 'Importance'].values[0], 
+                                          reverse=True)
+                
             for feature, recommendation in sorted_recommendations:
                 st.write(recommendation)
-            else:
-                st.write("Nguy cơ bệnh tim mạch của bạn là thấp. Tiếp tục duy trì lối sống lành mạnh và giữ gìn sức khỏe tốt.")
 
     except Exception as e:
-        row8_1.error(e)
+        row8_1.error(f"Lỗi: {e}")
+        import traceback
+        st.write(traceback.format_exc())
 
     # Use Local CSS File
     local_css("style.css")
+
+# Thêm đoạn code này vào phần khởi tạo để kiểm tra model và encoder
+if st.sidebar.checkbox("Kiểm tra model", False):
+    # Tạo các dữ liệu test đầy đủ 22 trường
+    test_input1 = {
+        'gender': 'male',
+        'race': 'white_only_non_hispanic',
+        'general_health': 'excellent',
+        'health_care_provider': 'yes_only_one',
+        'could_not_afford_to_see_doctor': 'no',
+        'length_of_time_since_last_routine_checkup': 'past_year',
+        'ever_diagnosed_with_heart_attack': 'no',
+        'ever_diagnosed_with_a_stroke': 'no',
+        'ever_told_you_had_a_depressive_disorder': 'no',
+        'ever_told_you_have_kidney_disease': 'no',
+        'ever_told_you_had_diabetes': 'no',
+        'BMI': 'normal_weight_bmi_18_5_to_24_9',
+        'difficulty_walking_or_climbing_stairs': 'no',
+        'physical_health_status': 'zero_days_not_good',
+        'mental_health_status': 'zero_days_not_good',
+        'asthma_Status': 'never_asthma',
+        'smoking_status': 'never_smoked',
+        'binge_drinking_status': 'no',
+        'exercise_status_in_past_30_Days': 'yes',
+        'age_category': 'Age_30_to_34',
+        'sleep_category': 'normal_sleep_6_to_8_hours',
+        'drinks_category': 'did_not_drink'
+    }
+    
+    test_input2 = {
+        'gender': 'female',
+        'race': 'white_only_non_hispanic',
+        'general_health': 'poor',
+        'health_care_provider': 'no',
+        'could_not_afford_to_see_doctor': 'yes',
+        'length_of_time_since_last_routine_checkup': '5+_years_ago',
+        'ever_diagnosed_with_heart_attack': 'yes',
+        'ever_diagnosed_with_a_stroke': 'yes',
+        'ever_told_you_had_a_depressive_disorder': 'yes',
+        'ever_told_you_have_kidney_disease': 'yes',
+        'ever_told_you_had_diabetes': 'yes',
+        'BMI': 'obese_bmi_30_or_more',
+        'difficulty_walking_or_climbing_stairs': 'yes',
+        'physical_health_status': '14_plus_days_not_good',
+        'mental_health_status': '14_plus_days_not_good',
+        'asthma_Status': 'current_asthma',
+        'smoking_status': 'current_smoker_every_day',
+        'binge_drinking_status': 'yes',
+        'exercise_status_in_past_30_Days': 'no',
+        'age_category': 'Age_70_to_74',
+        'sleep_category': 'very_short_sleep_0_to_3_hours',
+        'drinks_category': 'very_high_consumption_more_than_20_drinks'
+    }
+    
+    # Kiểm tra với 2 dữ liệu test khác nhau
+    for i, test_input in enumerate([test_input1, test_input2]):
+        test_df = pd.DataFrame([test_input])
+        st.write(f"Test {i+1} input:", test_df)
+        test_encoded = encoder.transform(test_df, y=None, override_return_df=False)
+        test_pred = model.predict_proba(test_encoded)[:, 1][0] * 100
+        st.write(f"Debug - Test {i+1} Prediction: {test_pred:.2f}%")
